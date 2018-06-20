@@ -11,7 +11,9 @@ DIM_TEST = '/home/tangih/Documents/datasets/image_matting/Adobe_Deep_Image_Matti
 SYNTHETIC_DATASET = '/home/tangih/Documents/datasets/3d_models/SYNTHETIC/'
 VOC_DATASET = '/home/tangih/Documents/datasets/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/JPEGImages/'
 
+
 def create_bgra(fg_path, alpha_path, out_path):
+    """ convert fg-jpg and alpha-jpg image into BGRA dataset """
     fg = cv2.imread(fg_path)
     alpha = cv2.imread(alpha_path, 0)
     bgra = np.zeros((fg.shape[0], fg.shape[1], 4), dtype=np.uint8)
@@ -21,6 +23,7 @@ def create_bgra(fg_path, alpha_path, out_path):
 
 
 def convert_dataset(fg_folder, alpha_folder, out_folder):
+    """ convert fg-jpg and alpha-jpg dataset into BGRA dataset """
     filenames = os.listdir(fg_folder)
     print('Converting dataset...')
     for filename in progressbar.progressbar(filenames):
@@ -85,15 +88,23 @@ def generate_trimaps(src_folder, dst_folder):
             cv2.imwrite(target, trimap)
 
 
-def create_list(fg_folder, voc_folder):
+def create_list(fg_folder, tr_folder, voc_folder, dst_file):
     fg_list = os.listdir(fg_folder)
     voc_list = os.listdir(voc_folder)
     n = 100
+    str = ''
     for fg in fg_list:
         fg_path = os.path.join(fg_folder, fg)
+        tr_path = os.path.join(tr_folder, fg)
+        assert os.path.isfile(tr_path)
         ids = np.random.randint(0, len(voc_list), size=n)
-        bg = [os.path.join(voc_folder, voc_list[i]) for i in ids]
-        
+        bg = ['{} {} {}'.format(fg_path,
+                                tr_path,
+                                os.path.join(voc_folder, voc_list[i]))
+              for i in ids]
+        str += '\n'.join(bg) + '\n'
+    with open(dst_file, 'w') as f:
+        f.write(str)
 
 
 if __name__ == '__main__':

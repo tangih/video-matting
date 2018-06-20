@@ -9,6 +9,7 @@ VGG_MEAN = [103.939, 116.779, 123.68]
 
 
 def init_conv(win_h, win_w, n_inputs, n_filters):
+    """ creates initial tensor using Xavier method """
     n = win_h * win_w * int(n_inputs)
     std = np.sqrt(2./n)
     conv = np.random.normal(loc=0., scale=std, size=(win_h, win_w, n_inputs, n_filters)).astype(np.float32)
