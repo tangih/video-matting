@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import utils
+import os
 
 VGG_MEAN = [103.939, 116.779, 123.68]
 
@@ -80,3 +80,13 @@ def get_batch(file_list, input_size, img_mean, rd_scale=False, rd_mirror=False):
         input[i], label[i] = random_crop_and_pad(inp, alpha, input_size)
     return input, label
 
+
+def get_file_list(root_dir, list_path):
+    """ reads file list """
+    files = []
+    with open(list_path, 'r') as f:
+        for line in f:
+            fg_path, tr_path, bg_path = [os.path.join(root_dir, rel_path)
+                                         for rel_path in line[:-1].split(' ')]
+            files.append([fg_path, tr_path, bg_path])
+    return files

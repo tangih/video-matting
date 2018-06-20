@@ -88,19 +88,24 @@ def generate_trimaps(src_folder, dst_folder):
             cv2.imwrite(target, trimap)
 
 
-def create_list(fg_folder, tr_folder, voc_folder, dst_file):
-    fg_list = os.listdir(fg_folder)
-    voc_list = os.listdir(voc_folder)
+def create_list(root_folder, dst_file):
+    voc_rel = 'VOC_bg'
+    fg_rel = os.path.join('fg', 'DIM_TRAIN')
+    tr_rel = os.path.join('tr', 'DIM_TRAIN')
+    fg_abs = os.path.join(root_folder, fg_rel)
+    voc_abs = os.path.join(root_folder, voc_rel)
+    fg_list = os.listdir(fg_abs)
+    voc_list = os.listdir(voc_abs)
     n = 100
     str = ''
     for fg in fg_list:
-        fg_path = os.path.join(fg_folder, fg)
-        tr_path = os.path.join(tr_folder, fg)
+        fg_path = os.path.join(fg_rel, fg)
+        tr_path = os.path.join(tr_rel, fg)
         assert os.path.isfile(tr_path)
         ids = np.random.randint(0, len(voc_list), size=n)
         bg = ['{} {} {}'.format(fg_path,
                                 tr_path,
-                                os.path.join(voc_folder, voc_list[i]))
+                                os.path.join(voc_rel, voc_list[i]))
               for i in ids]
         str += '\n'.join(bg) + '\n'
     with open(dst_file, 'w') as f:

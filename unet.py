@@ -14,10 +14,10 @@ def init_conv(win_h, win_w, n_inputs, n_filters):
     std = np.sqrt(2./n)
     conv = np.random.normal(loc=0., scale=std, size=(win_h, win_w, n_inputs, n_filters)).astype(np.float32)
     biases = np.random.normal(loc=0., scale=std, size=n_filters).astype(np.float32)
-    return tf.constant(conv), tf.constant(biases)
+    return tf.Variable(conv), tf.Variable(biases)
 
 
-class Vgg16:
+class UNet:
     def __init__(self, vgg16_npy_path=None):
         if vgg16_npy_path is None:
             path = inspect.getfile(Vgg16)
@@ -93,9 +93,6 @@ class Vgg16:
         self.data_dict = None
         print(("build model finished: %ds" % (time.time() - start_time)))
 
-    def avg_pool(self, bottom, name):
-        return tf.nn.avg_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
-
     def max_pool(self, bottom, name):
         return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
@@ -110,6 +107,21 @@ class Vgg16:
             bias = tf.nn.bias_add(conv, conv_biases)
             return bias
 
+    def get_conv_filter(self, name):
+        if name == "conv1_1":
+            old = self.data_dict[name][0]
+            tens = np.zeros((3, 3, 7, 64), dtype=np.float32)
+            tens[:, :, :3, :] = old
+            tens[:, :, 3:6, :] = old
+            return tf.Variable(tens, name='filter')
+        return tf.Variable(self.data_dict[name][0], name="filter")
+
+    def get_bias(self, name):
+        return tf.Variable(self.data_dict[name][1], name="biases")
+
+    def get_fc_weight(self, name):
+        return tf.Variable(self.data_dict[name][0], name="weights")
+
     def new_conv(self, input, n_filters, name):
         """ creates new convolution using Xavier initialisation """
         with tf.variable_scope(name):
@@ -120,49 +132,17 @@ class Vgg16:
             relu = tf.nn.relu(bias)
             return relu
 
-    def fc_layer(self, bottom, name):
-        with tf.variable_scope(name):
-            shape = bottom.get_shape().as_list()
-            dim = 1
-            for d in shape[1:]:
-                dim *= d
-            x = tf.reshape(bottom, [-1, dim])
-
-            weights = self.get_fc_weight(name)
-            biases = self.get_bias(name)
-
-            # Fully connected layer. Note that the '+' operation automatically
-            # broadcasts the biases.
-            fc = tf.nn.bias_add(tf.matmul(x, weights), biases)
-
-            return fc
-
-    def get_conv_filter(self, name):
-        if name == "conv1_1":
-            old = self.data_dict[name][0]
-            tens = np.zeros((3, 3, 7, 64), dtype=np.float32)
-            tens[:, :, :3, :] = old
-            tens[:, :, 3:6, :] = old
-            return tf.constant(tens, name='filter')
-        return tf.constant(self.data_dict[name][0], name="filter")
-
-    def get_bias(self, name):
-        return tf.constant(self.data_dict[name][1], name="biases")
-
-    def get_fc_weight(self, name):
-        return tf.constant(self.data_dict[name][0], name="weights")
-
     def upconv_concat(self, input_a, input_b, n_filters, name):
         """Upsample `inputA` and concat with `input_B`
 
         Args:
-            input_a (4-D Tensor): (N, H, W, C)
-            input_b (4-D Tensor): (N, 2*H, 2*H, C2)
+            input_a (4-D Tensor): (N, H, W, 2*C)
+            input_b (4-D Tensor): (N, 2*H, 2*H, C)
             n_filters: size of the up-conv layer
             name (str): name of the concat operation
 
         Returns:
-            output (4-D Tensor): (N, 2*H, 2*W, C + C2)
+            output (4-D Tensor): (N, 2*H, 2*W, 2*C)
         """
         with tf.variable_scope(name):
             h, w = input_b.shape[1:3]
