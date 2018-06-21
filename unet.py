@@ -20,7 +20,7 @@ def init_conv(win_h, win_w, n_inputs, n_filters):
 class UNet:
     def __init__(self, vgg16_npy_path=None):
         if vgg16_npy_path is None:
-            path = inspect.getfile(Vgg16)
+            path = inspect.getfile(UNet)
             path = os.path.abspath(os.path.join(path, os.pardir))
             path = os.path.join(path, 'weights', 'vgg16.npy')
             vgg16_npy_path = path
@@ -156,6 +156,6 @@ class UNet:
 
 if __name__ == '__main__':
     flags = {}
-    vgg = Vgg16()
+    model = UNet()
     x = tf.placeholder('float', [1, 321, 321, 7])
-    vgg.build(x)
+    model.build(x)

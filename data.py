@@ -6,11 +6,6 @@ import random
 
 import loader
 
-DIM_TRAIN = '/home/tangih/Documents/datasets/image_matting/Adobe_Deep_Image_Matting_Dataset/Adobe-licensed/'
-DIM_TEST = '/home/tangih/Documents/datasets/image_matting/Adobe_Deep_Image_Matting_Test_Set'
-SYNTHETIC_DATASET = '/home/tangih/Documents/datasets/3d_models/SYNTHETIC/'
-VOC_DATASET = '/home/tangih/Documents/datasets/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/JPEGImages/'
-
 
 def create_bgra(fg_path, alpha_path, out_path):
     """ convert fg-jpg and alpha-jpg image into BGRA dataset """
@@ -89,19 +84,19 @@ def generate_trimaps(src_folder, dst_folder):
 
 
 def create_list(root_folder, dst_file):
+    """ create training list for the "deep image matting" approach """
     voc_rel = 'VOC_bg'
     fg_rel = os.path.join('fg', 'DIM_TRAIN')
-    tr_rel = os.path.join('tr', 'DIM_TRAIN')
-    fg_abs = os.path.join(root_folder, fg_rel)
-    voc_abs = os.path.join(root_folder, voc_rel)
-    fg_list = os.listdir(fg_abs)
-    voc_list = os.listdir(voc_abs)
+    tr_rel = os.path.join('trimap', 'DIM_TRAIN')
+    print(tr_rel)
+    fg_list = os.listdir(os.path.join(root_folder, fg_rel))
+    voc_list = os.listdir(os.path.join(root_folder, voc_rel))
     n = 100
     str = ''
     for fg in fg_list:
         fg_path = os.path.join(fg_rel, fg)
         tr_path = os.path.join(tr_rel, fg)
-        assert os.path.isfile(tr_path)
+        assert os.path.isfile(os.path.join(loader.SYNTHETIC_DATASET, tr_path))
         ids = np.random.randint(0, len(voc_list), size=n)
         bg = ['{} {} {}'.format(fg_path,
                                 tr_path,
@@ -118,11 +113,14 @@ if __name__ == '__main__':
     # alpha_test = os.path.join(DIM_TEST, 'alpha')
     # fg_train = os.path.join(DIM_TRAIN, 'fgs', 'imgs')
     # fg_test = os.path.join(DIM_TEST, 'fg')
-    out_train = os.path.join(SYNTHETIC_DATASET, 'fg', 'DIM_TRAIN')
-    out_test = os.path.join(SYNTHETIC_DATASET, 'fg', 'DIM_TEST')
+    # out_train = os.path.join(SYNTHETIC_DATASET, 'fg', 'DIM_TRAIN')
+    # out_test = os.path.join(SYNTHETIC_DATASET, 'fg', 'DIM_TEST')
     # convert_dataset(fg_train, alpha_train, out_train)
     # convert_dataset(fg_test, alpha_test, out_test)
 
     # generate trimaps
-    generate_trimaps(out_train, os.path.join(SYNTHETIC_DATASET, 'trimap', 'DIM_TRAIN'))
-    generate_trimaps(out_test, os.path.join(SYNTHETIC_DATASET, 'trimap', 'DIM_TEST'))
+    # generate_trimaps(out_train, os.path.join(SYNTHETIC_DATASET, 'trimap', 'DIM_TRAIN'))
+    # generate_trimaps(out_test, os.path.join(SYNTHETIC_DATASET, 'trimap', 'DIM_TEST'))
+
+    # create training list
+    create_list(loader.SYNTHETIC_DATASET, './dataset/train.txt')
