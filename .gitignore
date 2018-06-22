@@ -2,3 +2,4 @@ __pycache__/*
 weights/*
 .idea/*
 .pytest_cache/*
+log/*
