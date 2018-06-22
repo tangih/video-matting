@@ -5,6 +5,7 @@ import progressbar
 import random
 
 import loader
+import params
 
 
 def create_bgra(fg_path, alpha_path, out_path):
@@ -83,12 +84,11 @@ def generate_trimaps(src_folder, dst_folder):
             cv2.imwrite(target, trimap)
 
 
-def create_list(root_folder, dst_file):
+def create_list(root_folder, dst_file, src_name):
     """ create training list for the "deep image matting" approach """
     voc_rel = 'VOC_bg'
-    fg_rel = os.path.join('fg', 'DIM_TRAIN')
-    tr_rel = os.path.join('trimap', 'DIM_TRAIN')
-    print(tr_rel)
+    fg_rel = os.path.join('fg', src_name)
+    tr_rel = os.path.join('trimap', src_name)
     fg_list = os.listdir(os.path.join(root_folder, fg_rel))
     voc_list = os.listdir(os.path.join(root_folder, voc_rel))
     n = 100
@@ -96,7 +96,7 @@ def create_list(root_folder, dst_file):
     for fg in fg_list:
         fg_path = os.path.join(fg_rel, fg)
         tr_path = os.path.join(tr_rel, fg)
-        assert os.path.isfile(os.path.join(loader.SYNTHETIC_DATASET, tr_path))
+        assert os.path.isfile(os.path.join(params.SYNTHETIC_DATASET, tr_path))
         ids = np.random.randint(0, len(voc_list), size=n)
         bg = ['{} {} {}'.format(fg_path,
                                 tr_path,
@@ -123,4 +123,4 @@ if __name__ == '__main__':
     # generate_trimaps(out_test, os.path.join(SYNTHETIC_DATASET, 'trimap', 'DIM_TEST'))
 
     # create training list
-    create_list(loader.SYNTHETIC_DATASET, './dataset/train.txt')
+    create_list(params.SYNTHETIC_DATASET, './dataset/valid.txt', 'DIM_TEST')

@@ -148,7 +148,7 @@ class UNet:
             h, w = input_b.shape[1:3]
             upsampled = tf.image.resize_images(input_a, [h, w])
             conv_weights, _ = init_conv(3, 3, upsampled.shape[-1], n_filters)
-            up_conv = tf.nn.conv2d(input, conv_weights, [1, 1, 1, 1], padding='SAME')
+            up_conv = tf.nn.conv2d(upsampled, conv_weights, [1, 1, 1, 1], padding='SAME')
 
             return tf.concat(
                 [up_conv, input_b], axis=-1, name="concat_{}".format(name))
