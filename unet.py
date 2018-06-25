@@ -14,7 +14,7 @@ def init_conv(win_h, win_w, n_inputs, n_filters):
     std = np.sqrt(2./n)
     conv = np.random.normal(loc=0., scale=std, size=(win_h, win_w, n_inputs, n_filters)).astype(np.float32)
     biases = np.random.normal(loc=0., scale=std, size=n_filters).astype(np.float32)
-    return tf.Variable(conv), tf.Variable(biases)
+    return tf.get_variable(initializer=conv, name='WAAAAA'), tf.get_variable(initializer=biases, name='WOOO')
 
 
 class UNet:

@@ -69,20 +69,22 @@ def train():
     train_file_list = loader.get_file_list(params.SYNTHETIC_DATASET, params.TRAINING_LIST)
     test_file_list = loader.get_file_list(params.SYNTHETIC_DATASET, params.TRAINING_LIST)
     prev_val_loss = -1.
+
     with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
         train_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'train'), sess.graph)
         test_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'test'))
         ex_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'examples'))
         saver = tf.train.Saver()
         iteration = 0
         for epoch in range(params.N_EPOCHS):
-            print('Training model, epoch {}/{}.'.format(epoch+1, params.N_EPOCHS))
             training_list = train_file_list
             test_list = test_file_list
             random.shuffle(training_list)
             random.shuffle(test_list)
             # training
             while not loader.epoch_is_over(training_list, params.BATCH_SIZE):
+                print('Training model, epoch {}/{}, iteration {}.'.format(epoch+1, params.N_EPOCHS, iteration+1))
                 batch_list = loader.get_batch_list(training_list, params.BATCH_SIZE)
                 inp, lab, rfg = loader.get_batch(batch_list, params.INPUT_SIZE, rd_scale=False, rd_mirror=True)
                 feed_dict = {x: inp, gt: lab, raw_fg: rfg}

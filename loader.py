@@ -204,6 +204,6 @@ def epoch_is_over(file_list, batch_size):
 
 if __name__ == '__main__':
     file_list = get_file_list(params.SYNTHETIC_DATASET, './dataset/valid.txt')
-    for i in range(1000):
+    for i in range(10):
         inp, lab, fg = get_batch([file_list[np.random.randint(0, len(file_list))]], (320, 320), False, False)
         show_entry(inp[0], lab[0], name='test')
