@@ -47,8 +47,8 @@ def train():
         loss = tf.reduce_mean(s_loss, name='loss')
 
     with tf.variable_scope('training'):
-        lr = tf.placeholder('float', [1], name='learning_rate')
-        optimizer = tf.train.GradientDescentOptimizer(learning_rate=lr)
+        # lr = tf.placeholder('float', 1, name='learning_rate')
+        optimizer = tf.train.AdamOptimizer(learning_rate=1e-5)
         train_op = optimizer.minimize(loss=loss, global_step=tf.train.get_global_step())
 
     with tf.variable_scope('summary'):
@@ -85,7 +85,7 @@ def train():
             while not loader.epoch_is_over(training_list, params.BATCH_SIZE):
                 batch_list = loader.get_batch_list(training_list, params.BATCH_SIZE)
                 inp, lab, rfg = loader.get_batch(batch_list, params.INPUT_SIZE, rd_scale=False, rd_mirror=True)
-                feed_dict = {x: inp, gt: lab, raw_fg: rfg, lr: 2.5e-5}
+                feed_dict = {x: inp, gt: lab, raw_fg: rfg}
                 summary, _ = sess.run([train_merged, train_op], feed_dict=feed_dict)
                 train_writer.add_summary(train_merged, iteration)
                 iteration += 1
