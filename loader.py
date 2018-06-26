@@ -4,59 +4,11 @@ import os
 import time
 
 import params
-
-
-def read_fg_img(img_path):
-    """ reads a foreground RGBA image """
-    img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
-    if img.dtype == np.uint16:
-        img = (((img+1) / 256.) - 1).astype(np.uint8)
-        # avoid problems with uint16 images
-    alpha = img[:, :, 3] / 255.
-    bgr = img[:, :, :3]
-    return alpha, bgr
-
-
-def create_composite_image(fg, bg, alpha):
-    """ creates composite """
-    tri_alpha = np.zeros_like(fg, dtype=np.float)
-    tri_alpha[:, :, 0] = alpha
-    tri_alpha[:, :, 1] = alpha
-    tri_alpha[:, :, 2] = alpha
-    composite = np.multiply(tri_alpha, fg) + np.multiply(1. - tri_alpha, bg)
-    return composite
-
-
-# def random_crop_and_pad(input, label, raw_fg=None, input_size=(320, 320)):
-#     """ randomly crops image, if needed add zero-padding """
-#     crop_type = [(320, 320), (480, 480), (640, 640)]  # we crop images of different sizes
-#     crop_h, crop_w = crop_type[np.random.randint(0, len(crop_type))]
-#     img_h, img_w = input.shape[:2]
-#     h, w = max(crop_h, img_h), max(crop_w, img_w)
-#     input_pad = np.zeros((h, w, 7), dtype=np.float)
-#     label_pad = np.zeros((h, w, 1), dtype=np.float)
-#     input_pad[:img_h, :img_w, :] = input
-#     label_pad[:img_h, :img_w, :] = label
-#     # randomly picks top-left corner
-#     i, j = np.random.randint(0, h-crop_h+1), np.random.randint(0, w-crop_w+1)
-#     input_crop = input_pad[i:i+crop_h, j:j+crop_w]
-#     label_crop = label_pad[i:i+crop_h, j:j+crop_w]
-#
-#     if input_size != (crop_h, crop_w):
-#         input_crop = cv2.resize(input_crop, input_size, interpolation=cv2.INTER_LINEAR)
-#         label_crop = cv2.resize(label_crop, input_size, interpolation=cv2.INTER_LINEAR)
-#     raw_fg_crop = None
-#     if raw_fg is not None:
-#         raw_fg_pad = np.zeros((h, w, 3), dtype=np.float)
-#         raw_fg_pad[:img_h, :img_w, :] = raw_fg
-#         raw_fg_crop = raw_fg_pad[i:i+crop_h, j:j+crop_w]
-#         if input_size != (crop_h, crop_w):
-#             raw_fg_crop = cv2.resize(raw_fg_crop, input_size, interpolation=cv2.INTER_LINEAR)
-#     label_crop = label_crop.reshape((label_crop.shape[0], label_crop.shape[1], 1))
-#     return input_crop, label_crop, raw_fg_crop
+import reader
 
 
 def get_padded_img(img, crop_h, crop_w):
+    """ returns padded image, the original image being randomly placed in the output window """
     h, w = img.shape[:2]
     new_h, new_w = max(crop_h, h), max(crop_w, w)
     padded_img = np.zeros((new_h, new_w, img.shape[2]), dtype=img.dtype)
@@ -87,7 +39,7 @@ def get_padded_img(img, crop_h, crop_w):
 def load_and_crop(entry, input_size):
     """ loads load input/label from training list entry """
     fg_path, tr_path, bg_path = entry
-    alpha, fg = read_fg_img(fg_path)
+    alpha, fg = reader.read_fg_img(fg_path)
     fg = fg.astype(dtype=np.float)  # potentially very big
     bg = cv2.imread(bg_path).astype(dtype=np.float)
     trimap = cv2.imread(tr_path, 0) / 255.
@@ -120,7 +72,7 @@ def load_and_crop(entry, input_size):
     alpha = cv2.resize(alpha, input_size, interpolation=cv2.INTER_LINEAR)
     trimap = cv2.resize(trimap, input_size, interpolation=cv2.INTER_LINEAR)
 
-    cmp = create_composite_image(fg, bg, alpha)
+    cmp = reader.create_composite_image(fg, bg, alpha)
     cmp -= params.VGG_MEAN
     bg -= params.VGG_MEAN
     trimap -= 0.5
