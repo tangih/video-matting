@@ -1,1 +1,1 @@
-# video-matting
+# Video Matting
