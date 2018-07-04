@@ -8,7 +8,7 @@ import time
 VGG_MEAN = [103.939, 116.779, 123.68]
 
 
-def init_conv(self, win_h, win_w, n_inputs, n_filters):
+def init_conv(win_h, win_w, n_inputs, n_filters):
     """ creates initial tensor using Xavier method """
     n = win_h * win_w * int(n_inputs)
     std = np.sqrt(2. / n)
@@ -28,8 +28,6 @@ class UNet:
 
         self.data_dict = np.load(vgg16_npy_path, encoding='latin1').item()
         print("npy file loaded")
-
-
 
     def max_pool(self, bottom, name):
         return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
@@ -81,6 +79,9 @@ class UNet:
 
     def get_fc_weight(self, name):
         return tf.Variable(self.data_dict[name][0], name="weights")
+
+    def get_conv_filter(self, name):
+        pass
 
 
 class UNetImage(UNet):
@@ -142,7 +143,7 @@ class UNetImage(UNet):
         # self.conv1_4 = tf.nn.relu(self.new_conv(self.conv1_3, 64, name='conv1_4'))
         self.conv1_3 = self.new_conv(self.upconv4, 1, name='conv1_5')
 
-        self.output = tf.nn.softmax(self.conv1_3)
+        self.output = tf.nn.softmax(self.conv1_3, name='output')
 
         self.data_dict = None
         print(("build model finished: %ds" % (time.time() - start_time)))
@@ -188,20 +189,6 @@ class UNetVideo(UNet):
         self.conv5_1 = self.conv_layer(self.pool4, "conv5_1")
         self.conv5_2 = self.conv_layer(self.conv5_1, "conv5_2")
 
-        # self.conv5_3 = self.conv_layer(self.conv5_2, "conv5_3")
-        # self.pool5 = self.max_pool(self.conv5_3, 'pool5')
-        #
-        # self.fc6 = self.fc_layer(self.pool5, "fc6")
-        # assert self.fc6.get_shape().as_list()[1:] == [4096]
-        # self.relu6 = tf.nn.relu(self.fc6)
-        #
-        # self.fc7 = self.fc_layer(self.relu6, "fc7")
-        # self.relu7 = tf.nn.relu(self.fc7)
-        #
-        # self.fc8 = self.fc_layer(self.relu7, "fc8")
-        #
-        # self.prob = tf.nn.softmax(self.fc8, name="prob")
-
         self.upconv1 = self.upconv_concat(self.conv5_2, self.conv4_3, 512, name='upconv_1')
         self.conv4_4 = tf.nn.relu(self.new_conv(self.upconv1, 512, name='conv4_4'))
         # self.conv4_5 = tf.nn.relu(self.new_conv(self.conv4_4, 512, name='conv4_5'))
@@ -236,5 +223,3 @@ if __name__ == '__main__':
     model = UNetImage()
     x = tf.placeholder('float', [1, 321, 321, 7])
     model.build(x)
-
-

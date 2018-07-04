@@ -136,6 +136,7 @@ def augment(fg, bg, alpha):
 
 
 def augmentation(dim_dataset, voc_dataset, sig_dataset):
+    """ create synthetic data for video matting by warping composite images (DIM matte / VOC background) """
     n = 50
     # we both take files from test and train datasets
     filepaths = [[os.path.join(dim_dataset, 'fg', folder, file)
