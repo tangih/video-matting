@@ -30,7 +30,7 @@ def read_flow(flow_path):
         return data
 
 
-def load_test_image(filename='in0115.png', bg_name='sea.jpg'):
+def load_test_image(filename='in0062.png', bg_name='sea.jpg'):
     """ loads a test image """
     path = os.path.join('test_data', filename)
     alpha, fg = read_fg_img(path)
@@ -38,7 +38,7 @@ def load_test_image(filename='in0115.png', bg_name='sea.jpg'):
     bg = cv2.imread(bg_path)
     h, w = fg.shape[:2]
     if bg.shape[0] != h or bg.shape[1] != w:
-        bg = cv2.resize(bg, dsize=(h, w), interpolation=cv2.INTER_LINEAR)
+        bg = cv2.resize(bg, dsize=(w, h), interpolation=cv2.INTER_LINEAR)
     cmp = create_composite_image(fg, bg, alpha)
     return fg, bg, cmp, alpha
 

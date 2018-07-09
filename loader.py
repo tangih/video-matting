@@ -154,8 +154,45 @@ def epoch_is_over(file_list, batch_size):
     return len(file_list) < batch_size
 
 
+def psnr(img, img_ref):
+    """
+    returns peak signal to noise ratio
+    images have to be [0, 1] float
+    """
+    img_ = img.copy()
+    img_ref_ = img_ref.copy()
+    if len(img.shape) == 2:
+        img_ = img_.reshape((img.shape[0], img.shape[1], 1))
+    if len(img_ref.shape) == 2:
+        img_ref_ = img_ref_.reshape((img_ref.shape[0], img_ref.shape[1], 1))
+    eqm = np.mean(np.square(np.linalg.norm(img_ - img_ref_, axis=2)))
+    eps = 1e-6  # to avoid dividing by zero
+    return 10. * np.log10(1./(eps+eqm))
+
+
+def add_noise(img, var=0.1):
+    noised = img.copy()
+    if len(img.shape) == 2:
+        noised = noised.reshape((img.shape[0], img.shape[1], 1))
+    h, w, n = noised.shape
+    noise = np.random.normal(0., var, (h, w, n))
+    noised += noise
+    return np.clip(noised, 0, 1)
+
+
+
 if __name__ == '__main__':
-    file_list = get_file_list(params.SYNTHETIC_DATASET, './dataset/valid.txt')
-    for i in range(10):
-        inp, lab, fg = get_batch([file_list[np.random.randint(0, len(file_list))]], (320, 320), False, False)
-        show_entry(inp[0], lab[0], name='test')
+    # file_list = get_file_list(params.SYNTHETIC_DATASET, './dataset/valid.txt')
+    # for i in range(10):
+    #     inp, lab, fg = get_batch([file_list[np.random.randint(0, len(file_list))]], (320, 320), False, False)
+    #     show_entry(inp[0], lab[0], name='test')
+    _, _, img, alpha = reader.load_test_image()
+    img /= 255.
+    var = 0.1
+    noised = add_noise(img, var=var)
+    noised_al = add_noise(alpha, var=var)
+    print('PSNR between the images is {:.5f}'.format(psnr(noised, img)))
+    print('PSNR between the images is {:.5f}'.format(psnr(noised_al, alpha)))
+    cv2.imshow('adding noise', np.concatenate((img, noised), axis=0))
+    cv2.imshow('adding noise to alpha', np.concatenate((alpha, noised_al.reshape((alpha.shape[0], alpha.shape[1]))), axis=0))
+    cv2.waitKey(0)
