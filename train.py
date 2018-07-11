@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import random
 import os
+import time
 
 import loader
 import unet
@@ -26,7 +27,7 @@ def regular_l1(output, gt, name):
 
 def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pred,
                        train_writer, test_writer, ex_writer,
-                       saver, starting_point=0):
+                       saver, t_str, starting_point=0):
     in_cmp, in_bg, in_trimap = tf.split(value=x, num_or_size_splits=[3, 3, 1], axis=3)
     with tf.variable_scope('loss'):
         alpha_loss = regular_l1(pred, gt, name='alpha_loss')
@@ -53,8 +54,8 @@ def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pre
     prev_val_loss = -1.
     iteration = starting_point
     for epoch in range(params.N_EPOCHS):
-        training_list = train_file_list
-        test_list = test_file_list
+        training_list = train_file_list.copy()
+        test_list = test_file_list.copy()
         random.shuffle(training_list)
         random.shuffle(test_list)
         # training
@@ -74,10 +75,10 @@ def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pre
             batch_list = loader.get_batch_list(test_list, params.BATCH_SIZE)
             inp, lab, rfg = loader.get_batch(batch_list, params.INPUT_SIZE, rd_scale=False, rd_mirror=True)
             feed_dict = {x: inp, gt: lab, raw_fg: rfg}
-            summary, loss = sess.run([test_merged, loss], feed_dict=feed_dict)
-            val_loss += loss
+            ls = sess.run([loss], feed_dict=feed_dict)
+            # test_writer.add_summary(summary, iteration)
+            val_loss += np.mean(ls)
             n_batch += 1
-        test_writer.add_summary(test_merged, iteration)
         val_loss /= n_batch
         improvement = 'NaN'
         if prev_val_loss != -1.:
@@ -89,10 +90,10 @@ def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pre
         ex_list = [test_file_list[np.random.randint(0, len(test_file_list))] for _ in range(n_ex)]
         ex_inp, ex_lab, _ = loader.get_batch(ex_list, params.INPUT_SIZE, rd_scale=False, rd_mirror=True)
         feed_dict = {x: ex_inp, gt: ex_lab}
-        summary = sess.run([ex_merged], feed_dict)
+        summary = sess.run([ex_merged], feed_dict)[0]
         ex_writer.add_summary(summary, iteration)
         print('Saving chekpoint...')
-        saver.save(sess, os.path.join(params.LOG_DIR, 'model'), global_step=iteration)
+        saver.save(sess, os.path.join(params.LOG_DIR, 'weights_{}'.format(t_str), 'model'), global_step=iteration)
 
 
 def train():
@@ -112,13 +113,14 @@ def train():
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-        train_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'train'), sess.graph)
-        test_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'test'))
-        ex_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'examples'))
+        t_str = time.asctime().replace(' ', '_')
+        train_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'train_{}'.format(t_str)), sess.graph)
+        test_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'test_{}'.format(t_str)))
+        ex_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'examples_{}'.format(t_str)))
         saver = tf.train.Saver()
         training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pred,
                            train_writer, test_writer, ex_writer,
-                           saver, starting_point=0)
+                           saver, t_str, starting_point=0)
 
 
 def resume_training(meta_path, weight_folder):
@@ -134,13 +136,14 @@ def resume_training(meta_path, weight_folder):
         raw_fg = graph.get_tensor_by_name('input/raw_fg:0')
         pred = graph.get_tensor_by_name('model/output:0')
 
-        train_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'train'), sess.graph)
-        test_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'test'))
-        ex_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'examples'))
+        t_str = time.asctime().replace(' ', '_')
+        train_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'train_{}'.format(t_str)), sess.graph)
+        test_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'test_{}'.format(t_str)))
+        ex_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'examples_{}'.format(t_str)))
         saver = tf.train.Saver()
         training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pred,
                            train_writer, test_writer, ex_writer,
-                           saver, starting_point=0)
+                           saver, t_str, starting_point=0)
 
 
 if __name__ == '__main__':
