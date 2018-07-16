@@ -39,8 +39,7 @@ class UNet:
             conv = tf.nn.conv2d(input, conv_weights, [1, 1, 1, 1], padding='SAME')
             # conv_biases =
             bias = tf.nn.bias_add(conv, conv_biases)
-            relu = tf.nn.relu(bias)
-            return relu
+            return bias
 
     def upconv_concat(self, input_a, input_b, n_filters, name):
         """Upsample `inputA` and concat with `input_B`
@@ -94,26 +93,26 @@ class UNetImage(UNet):
 
         start_time = time.time()
         print("build model started")
-        self.conv1_1 = self.conv_layer(input, "conv1_1")
-        self.conv1_2 = self.conv_layer(self.conv1_1, "conv1_2")
+        self.conv1_1 = tf.nn.relu(self.conv_layer(input, "conv1_1"))
+        self.conv1_2 = tf.nn.relu(self.conv_layer(self.conv1_1, "conv1_2"))
         self.pool1 = self.max_pool(self.conv1_2, 'pool1')
 
-        self.conv2_1 = self.conv_layer(self.pool1, "conv2_1")
-        self.conv2_2 = self.conv_layer(self.conv2_1, "conv2_2")
+        self.conv2_1 = tf.nn.relu(self.conv_layer(self.pool1, "conv2_1"))
+        self.conv2_2 = tf.nn.relu(self.conv_layer(self.conv2_1, "conv2_2"))
         self.pool2 = self.max_pool(self.conv2_2, 'pool2')
 
-        self.conv3_1 = self.conv_layer(self.pool2, "conv3_1")
-        self.conv3_2 = self.conv_layer(self.conv3_1, "conv3_2")
-        self.conv3_3 = self.conv_layer(self.conv3_2, "conv3_3")
+        self.conv3_1 = tf.nn.relu(self.conv_layer(self.pool2, "conv3_1"))
+        self.conv3_2 = tf.nn.relu(self.conv_layer(self.conv3_1, "conv3_2"))
+        self.conv3_3 = tf.nn.relu(self.conv_layer(self.conv3_2, "conv3_3"))
         self.pool3 = self.max_pool(self.conv3_3, 'pool3')
 
-        self.conv4_1 = self.conv_layer(self.pool3, "conv4_1")
-        self.conv4_2 = self.conv_layer(self.conv4_1, "conv4_2")
-        self.conv4_3 = self.conv_layer(self.conv4_2, "conv4_3")
+        self.conv4_1 = tf.nn.relu(self.conv_layer(self.pool3, "conv4_1"))
+        self.conv4_2 = tf.nn.relu(self.conv_layer(self.conv4_1, "conv4_2"))
+        self.conv4_3 = tf.nn.relu(self.conv_layer(self.conv4_2, "conv4_3"))
         self.pool4 = self.max_pool(self.conv4_3, 'pool4')
 
-        self.conv5_1 = self.conv_layer(self.pool4, "conv5_1")
-        self.conv5_2 = self.conv_layer(self.conv5_1, "conv5_2")
+        self.conv5_1 = tf.nn.relu(self.conv_layer(self.pool4, "conv5_1"))
+        self.conv5_2 = tf.nn.relu(self.conv_layer(self.conv5_1, "conv5_2"))
 
         # self.conv5_3 = self.conv_layer(self.conv5_2, "conv5_3")
         # self.pool5 = self.max_pool(self.conv5_3, 'pool5')
@@ -168,26 +167,26 @@ class UNetVideo(UNet):
 
         start_time = time.time()
         print("build model started")
-        self.conv1_1 = self.conv_layer(input, "conv1_1")
-        self.conv1_2 = self.conv_layer(self.conv1_1, "conv1_2")
+        self.conv1_1 = tf.nn.relu(self.conv_layer(input, "conv1_1"))
+        self.conv1_2 = tf.nn.relu(self.conv_layer(self.conv1_1, "conv1_2"))
         self.pool1 = self.max_pool(self.conv1_2, 'pool1')
 
-        self.conv2_1 = self.conv_layer(self.pool1, "conv2_1")
-        self.conv2_2 = self.conv_layer(self.conv2_1, "conv2_2")
+        self.conv2_1 = tf.nn.relu(self.conv_layer(self.pool1, "conv2_1"))
+        self.conv2_2 = tf.nn.relu(self.conv_layer(self.conv2_1, "conv2_2"))
         self.pool2 = self.max_pool(self.conv2_2, 'pool2')
 
-        self.conv3_1 = self.conv_layer(self.pool2, "conv3_1")
-        self.conv3_2 = self.conv_layer(self.conv3_1, "conv3_2")
-        self.conv3_3 = self.conv_layer(self.conv3_2, "conv3_3")
+        self.conv3_1 = tf.nn.relu(self.conv_layer(self.pool2, "conv3_1"))
+        self.conv3_2 = tf.nn.relu(self.conv_layer(self.conv3_1, "conv3_2"))
+        self.conv3_3 = tf.nn.relu(self.conv_layer(self.conv3_2, "conv3_3"))
         self.pool3 = self.max_pool(self.conv3_3, 'pool3')
 
-        self.conv4_1 = self.conv_layer(self.pool3, "conv4_1")
-        self.conv4_2 = self.conv_layer(self.conv4_1, "conv4_2")
-        self.conv4_3 = self.conv_layer(self.conv4_2, "conv4_3")
+        self.conv4_1 = tf.nn.relu(self.conv_layer(self.pool3, "conv4_1"))
+        self.conv4_2 = tf.nn.relu(self.conv_layer(self.conv4_1, "conv4_2"))
+        self.conv4_3 = tf.nn.relu(self.conv_layer(self.conv4_2, "conv4_3"))
         self.pool4 = self.max_pool(self.conv4_3, 'pool4')
 
-        self.conv5_1 = self.conv_layer(self.pool4, "conv5_1")
-        self.conv5_2 = self.conv_layer(self.conv5_1, "conv5_2")
+        self.conv5_1 = tf.nn.relu(self.conv_layer(self.pool4, "conv5_1"))
+        self.conv5_2 = tf.nn.relu(self.conv_layer(self.conv5_1, "conv5_2"))
 
         self.upconv1 = self.upconv_concat(self.conv5_2, self.conv4_3, 512, name='upconv_1')
         self.conv4_4 = tf.nn.relu(self.new_conv(self.upconv1, 512, name='conv4_4'))

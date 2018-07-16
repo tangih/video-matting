@@ -116,6 +116,61 @@ def get_batch(file_list, input_size, rd_scale=False, rd_mirror=False):
     return input, label, raw_fgs
 
 
+def simple_load_crop(entry, input_size):
+    fg_path, tr_path, bg_path = entry
+    alpha, fg = reader.read_fg_img(fg_path)
+    fg = fg.astype(dtype=np.float)  # potentially very big
+    bg = cv2.imread(bg_path).astype(dtype=np.float)
+    crop_type = [(320, 320), (480, 480), (640, 640)]  # we crop images of different sizes
+    crop_h, crop_w = crop_type[np.random.randint(0, len(crop_type))]
+    fg_h, fg_w = fg.shape[:2]
+    if fg_h < crop_h or fg_w < crop_w:
+        # in that case the image is not too big, and we have to add padding
+        alpha = alpha.reshape((alpha.shape[0], alpha.shape[1], 1))
+        cat = np.concatenate((fg, alpha, trimap), axis=2)
+        cropped_cat = get_padded_img(cat, crop_h, crop_w)
+        fg, alpha, trimap = np.split(cropped_cat, indices_or_sections=[3, 4], axis=2)
+    # otherwise, the fg is likely to be HRes, we directly crop it and dismiss the original image
+    # to avoid manipulation big images
+    fg_h, fg_w = fg.shape[:2]
+    i, j = np.random.randint(0, fg_h - crop_h + 1), np.random.randint(0, fg_w - crop_w + 1)
+    fg = fg[i:i + crop_h, j:j + crop_h]
+    alpha = alpha[i:i + crop_h, j:j + crop_h]
+    # randomly picks top-left corner
+
+    bg_crop_h, bg_crop_w = int(np.ceil(crop_h * bg.shape[0] / fg.shape[0])), \
+                           int(np.ceil(crop_w * bg.shape[1] / fg.shape[1]))
+    padded_bg = get_padded_img(bg, bg_crop_h, bg_crop_w)
+    i, j = np.random.randint(0, bg.shape[0] - bg_crop_h + 1), np.random.randint(0, bg.shape[1] - bg_crop_w + 1)
+    cropped_bg = padded_bg[i:i + bg_crop_h, j:j + bg_crop_w]
+    bg = cv2.resize(src=cropped_bg, dsize=input_size, interpolation=cv2.INTER_LINEAR)
+    fg = cv2.resize(fg, input_size, interpolation=cv2.INTER_LINEAR)
+    alpha = cv2.resize(alpha, input_size, interpolation=cv2.INTER_LINEAR)
+
+    cmp = reader.create_composite_image(fg, bg, alpha)
+    cmp -= params.VGG_MEAN
+    bg -= params.VGG_MEAN
+    # inp = np.concatenate((cmp,
+    #                       bg,
+    #                       trimap.reshape((h, w, 1))), axis=2)
+    label = alpha.reshape((alpha.shape[0], alpha.shape[1], 1))
+    return cmp, bg, label, fg
+
+
+def simple_batch(file_list, input_size):
+    batch_size = len(file_list)
+    cmps = np.zeros((batch_size, input_size[0], input_size[1], 3), dtype=np.float)
+    bgs = np.zeros((batch_size, input_size[0], input_size[1], 3), dtype=np.float)
+    label = np.zeros((batch_size, input_size[0], input_size[1], 1), dtype=np.float)
+    raw_fgs = np.zeros((batch_size, input_size[0], input_size[1], 3), dtype=np.float)
+    for i in range(len(file_list)):
+        # ref = time.time()
+        # print(file_list[i])
+        cmp, bg, lab, raw_fg = simple_load_crop(file_list[i], input_size)
+        cmps[i], bgs[i], label[i], raw_fgs[i] = cmp, bg, lab, raw_fg
+    return cmps, bgs, label, raw_fgs
+
+
 def show_entry(inp, lab, name):
     """ visualize training entry """
     assert inp.shape[0] == lab.shape[0] and inp.shape[1] == lab.shape[1]
