@@ -19,10 +19,18 @@ def composite(fg, bg, alpha):
 
 def regular_l1(output, gt, name):
     """ regularized L1 loss """
+    print(output)
+    print(gt)
     sq_loss = tf.square(tf.subtract(output, gt))
     eps2 = tf.square(tf.constant(1e-6))
     loss = tf.sqrt(sq_loss + eps2, name=name)
     return loss
+
+
+def bgr2rgb(bgr):
+    blue, green, red = tf.split(value=bgr, num_or_size_splits=3, axis=-1)
+    image = tf.concat([red, green, blue], axis=-1)
+    return image
 
 
 def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pred,
@@ -44,7 +52,7 @@ def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pre
         summary_loss = tf.summary.scalar('loss', loss)
         summary_alpha_loss = tf.summary.scalar('alpha_loss', tf.reduce_mean(alpha_loss))
         summary_cmp_loss = tf.summary.scalar('compositional_loss', tf.reduce_mean(cmp_loss))
-        summary_cmp = tf.summary.image('composite', in_cmp)
+        summary_cmp = tf.summary.image('composite', bgr2rgb(in_cmp))
         summary_gt = tf.summary.image('ground_truth', gt)
         summary_pred = tf.summary.image('prediction', pred)
     train_summaries = [summary_loss, summary_alpha_loss, summary_cmp_loss]
@@ -157,9 +165,11 @@ def simple_train():
         raw_fg = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 3], name='raw_fg')
         gt = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 1], name='gt')
     with tf.variable_scope('model'):
-        pred = unet_simple.create_model(in_cmp, in_bg, diff)
-
-
+        unet = unet_simple.create_model(in_cmp, in_bg, diff)
+        pred = unet.output
+    train_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'model/simple_unet')
+    print('Training variables:')
+    print(train_vars)
     train_file_list = loader.get_file_list(params.SYNTHETIC_DATASET, params.TRAINING_LIST)
     test_file_list = loader.get_file_list(params.SYNTHETIC_DATASET, params.TRAINING_LIST)
 
@@ -178,19 +188,17 @@ def simple_train():
             lr = 1e-3
             print('Training with learning rate of {}'.format(lr))
             optimizer = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.9, beta2=0.999, epsilon=1e-08)
-            train_op = optimizer.minimize(loss=loss, global_step=tf.train.get_global_step())
+            train_op = optimizer.minimize(loss=loss, global_step=tf.train.get_global_step(), var_list=train_vars)
         with tf.variable_scope('summary'):
             summary_loss = tf.summary.scalar('loss', loss)
             summary_alpha_loss = tf.summary.scalar('alpha_loss', tf.reduce_mean(alpha_loss))
             summary_cmp_loss = tf.summary.scalar('compositional_loss', tf.reduce_mean(cmp_loss))
-            summary_cmp = tf.summary.image('composite', in_cmp)
+            summary_cmp = tf.summary.image('composite', bgr2rgb(in_cmp))
             summary_gt = tf.summary.image('ground_truth', gt)
             summary_pred = tf.summary.image('prediction', pred)
         train_summaries = [summary_loss, summary_alpha_loss, summary_cmp_loss]
-        test_summaries = [summary_loss, summary_alpha_loss, summary_cmp_loss]
         ex_summaries = [summary_cmp, summary_gt, summary_pred]
         train_merged = tf.summary.merge(train_summaries)
-        # test_merged = tf.summary.merge(test_summaries)
         ex_merged = tf.summary.merge(ex_summaries)
         prev_val_loss = -1.
         iteration = 0
@@ -241,5 +249,5 @@ def simple_train():
 
 
 if __name__ == '__main__':
-    train()
-    # simple_train()
+    # train()
+    simple_train()

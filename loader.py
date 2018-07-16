@@ -127,7 +127,7 @@ def simple_load_crop(entry, input_size):
     if fg_h < crop_h or fg_w < crop_w:
         # in that case the image is not too big, and we have to add padding
         alpha = alpha.reshape((alpha.shape[0], alpha.shape[1], 1))
-        cat = np.concatenate((fg, alpha, trimap), axis=2)
+        cat = np.concatenate((fg, alpha), axis=2)
         cropped_cat = get_padded_img(cat, crop_h, crop_w)
         fg, alpha, trimap = np.split(cropped_cat, indices_or_sections=[3, 4], axis=2)
     # otherwise, the fg is likely to be HRes, we directly crop it and dismiss the original image

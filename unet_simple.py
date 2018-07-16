@@ -3,7 +3,6 @@ import os
 
 import numpy as np
 import tensorflow as tf
-import time
 
 VGG_MEAN = [103.939, 116.779, 123.68]
 
@@ -45,35 +44,19 @@ class Vgg16:
         if vgg16_npy_path is None:
             path = inspect.getfile(Vgg16)
             path = os.path.abspath(os.path.join(path, os.pardir))
-            path = os.path.join(path, "vgg16.npy")
+            path = os.path.join(path, 'weights', 'vgg16.npy')
             vgg16_npy_path = path
             print(path)
 
         self.data_dict = np.load(vgg16_npy_path, encoding='latin1').item()
         print("npy file loaded")
 
-    def build(self, rgb):
+    def build(self, bgr):
         """
         load variable from npy to build the VGG
 
         :param rgb: rgb image [batch, height, width, 3] values scaled [0, 1]
         """
-
-        start_time = time.time()
-        print("build model started")
-        rgb_scaled = rgb * 255.0
-
-        # Convert RGB to BGR
-        red, green, blue = tf.split(axis=3, num_or_size_splits=3, value=rgb_scaled)
-        assert red.get_shape().as_list()[1:] == [224, 224, 1]
-        assert green.get_shape().as_list()[1:] == [224, 224, 1]
-        assert blue.get_shape().as_list()[1:] == [224, 224, 1]
-        bgr = tf.concat(axis=3, values=[
-            blue - VGG_MEAN[0],
-            green - VGG_MEAN[1],
-            red - VGG_MEAN[2],
-        ])
-        assert bgr.get_shape().as_list()[1:] == [224, 224, 3]
 
         self.conv1_1 = tf.nn.relu(self.conv_layer(bgr, "conv1_1"))
         self.conv1_2_l = self.conv_layer(self.conv1_1, "conv1_2")
@@ -101,21 +84,7 @@ class Vgg16:
         self.conv5_2 = tf.nn.relu(self.conv_layer(self.conv5_1, "conv5_2"))
         self.conv5_3_l = self.conv_layer(self.conv5_2, "conv5_3")
         self.conv5_3 = tf.nn.relu(self.conv5_3_l)
-        self.pool5 = self.max_pool(self.conv5_3, 'pool5')
 
-        self.fc6 = self.fc_layer(self.pool5, "fc6")
-        assert self.fc6.get_shape().as_list()[1:] == [4096]
-        self.relu6 = tf.nn.relu(self.fc6)
-
-        self.fc7 = self.fc_layer(self.relu6, "fc7")
-        self.relu7 = tf.nn.relu(self.fc7)
-
-        self.fc8 = self.fc_layer(self.relu7, "fc8")
-
-        self.prob = tf.nn.softmax(self.fc8, name="prob")
-
-        self.data_dict = None
-        print(("build model finished: %ds" % (time.time() - start_time)))
 
     def avg_pool(self, bottom, name):
         return tf.nn.avg_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
@@ -127,38 +96,18 @@ class Vgg16:
         with tf.variable_scope(name):
             filt = self.get_conv_filter(name)
 
-            conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME', trainable=False)
+            conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
 
             conv_biases = self.get_bias(name)
-            bias = tf.nn.bias_add(conv, conv_biases, trainable=False)
+            bias = tf.nn.bias_add(conv, conv_biases)
 
             return bias
-
-    def fc_layer(self, bottom, name):
-        with tf.variable_scope(name):
-            shape = bottom.get_shape().as_list()
-            dim = 1
-            for d in shape[1:]:
-                dim *= d
-            x = tf.reshape(bottom, [-1, dim])
-
-            weights = self.get_fc_weight(name)
-            biases = self.get_bias(name)
-
-            # Fully connected layer. Note that the '+' operation automatically
-            # broadcasts the biases.
-            fc = tf.nn.bias_add(tf.matmul(x, weights), biases)
-
-            return fc
 
     def get_conv_filter(self, name):
         return tf.constant(self.data_dict[name][0], name="filter")
 
     def get_bias(self, name):
         return tf.constant(self.data_dict[name][1], name="biases")
-
-    def get_fc_weight(self, name):
-        return tf.constant(self.data_dict[name][0], name="weights")
 
 
 class UNetSimple:
@@ -197,7 +146,7 @@ def create_model(cmp, bg, diff):
     vgg1.build(cmp)
     vgg2.build(bg)
     vgg3.build(diff)
-    with tf.name_scope('feature_extract'):
+    with tf.variable_scope('feature_extract'):
         layers = {
             'conv1': [tf.concat([cmp, bg, diff], axis=-1, name='input'),
                       tf.concat([vgg1.conv1_1, vgg2.conv1_1, vgg3.conv1_1], axis=-1, name='conv1_1'),
@@ -214,6 +163,7 @@ def create_model(cmp, bg, diff):
                       tf.concat([vgg1.conv5_2, vgg2.conv5_2, vgg3.conv5_2], axis=-1, name='conv5_2'),
                       tf.concat([vgg1.conv5_3, vgg2.conv5_3, vgg3.conv5_3], axis=-1, name='conv5_3')]
         }
-    model = UNetSimple(layers)
+    with tf.variable_scope('simple_unet'):
+        model = UNetSimple(layers)
     return model
 
