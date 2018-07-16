@@ -151,9 +151,9 @@ class UNetImage(UNet):
     def get_conv_filter(self, name):
         if name == "conv1_1":
             old = self.data_dict[name][0]
-            tens = np.zeros((3, 3, 7, 64), dtype=np.float32)
-            tens[:, :, :3, :] = old
-            tens[:, :, 3:6, :] = old
+            tens = np.zeros((3, 3, 6, 64), dtype=np.float32)
+            tens[:, :, :3, :] = old / 2.
+            tens[:, :, 3:6, :] = old / 2.
             return tf.Variable(tens, name='filter')
         return tf.Variable(self.data_dict[name][0], name="filter")
 

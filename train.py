@@ -28,7 +28,7 @@ def regular_l1(output, gt, name):
 def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pred,
                        train_writer, test_writer, ex_writer,
                        saver, t_str, starting_point=0):
-    in_cmp, in_bg, in_trimap = tf.split(value=x, num_or_size_splits=[3, 3, 1], axis=3)
+    in_cmp, in_bg = tf.split(value=x, num_or_size_splits=[3, 3], axis=3)
     with tf.variable_scope('loss'):
         alpha_loss = regular_l1(pred, gt, name='alpha_loss')
         pred_cmp = composite(raw_fg, in_bg, pred)
@@ -36,7 +36,9 @@ def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pre
         s_loss = tf.add(0.5 * alpha_loss, 0.5 * cmp_loss)
         loss = tf.reduce_mean(s_loss, name='loss')
     with tf.variable_scope('training'):
-        optimizer = tf.train.AdamOptimizer(learning_rate=1e-5)
+        lr = 1e-4
+        print('Training with learning rate of {}'.format(lr))
+        optimizer = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.9, beta2=0.999, epsilon=1e-08)
         train_op = optimizer.minimize(loss=loss, global_step=tf.train.get_global_step())
     with tf.variable_scope('summary'):
         summary_loss = tf.summary.scalar('loss', loss)
@@ -53,6 +55,8 @@ def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pre
     ex_merged = tf.summary.merge(ex_summaries)
     prev_val_loss = -1.
     iteration = starting_point
+    sess.run(tf.global_variables_initializer())
+
     for epoch in range(params.N_EPOCHS):
         training_list = train_file_list.copy()
         test_list = test_file_list.copy()
@@ -65,7 +69,7 @@ def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pre
             inp, lab, rfg = loader.get_batch(batch_list, params.INPUT_SIZE, rd_scale=False, rd_mirror=True)
             feed_dict = {x: inp, gt: lab, raw_fg: rfg}
             summary, _ = sess.run([train_merged, train_op], feed_dict=feed_dict)
-            train_writer.add_summary(train_merged, iteration)
+            train_writer.add_summary(summary, iteration)
             iteration += 1
         # validation
         print('Training completed. Computing validation loss...')
@@ -83,7 +87,7 @@ def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pre
         improvement = 'NaN'
         if prev_val_loss != -1.:
             improvement = '{:2f}%'.format((prev_val_loss - val_loss) / prev_val_loss)
-        print('Validation loss: {.3f}. Improvement: {}'.format(val_loss, improvement))
+        print('Validation loss: {:.3f}. Improvement: {}'.format(val_loss, improvement))
         print('Saving examples')
         # loads and visualize example prediction of current model
         n_ex = 5
@@ -100,7 +104,7 @@ def train():
     """ train UNet network from scratch """
     model = unet.UNetImage()
     with tf.variable_scope('input'):
-        x = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 7], name='input')
+        x = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 6], name='input')
         raw_fg = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 3], name='raw_fg')
         gt = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 1], name='gt')
 
@@ -112,7 +116,6 @@ def train():
     test_file_list = loader.get_file_list(params.SYNTHETIC_DATASET, params.TRAINING_LIST)
 
     with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
         t_str = time.asctime().replace(' ', '_')
         train_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'train_{}'.format(t_str)), sess.graph)
         test_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'test_{}'.format(t_str)))

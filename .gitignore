@@ -3,3 +3,4 @@ weights/*
 .idea/*
 .pytest_cache/*
 log/*
+SYNTHETIC/*

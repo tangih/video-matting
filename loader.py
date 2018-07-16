@@ -77,9 +77,10 @@ def load_and_crop(entry, input_size):
     bg -= params.VGG_MEAN
     trimap -= 0.5
     h, w = cmp.shape[:2]
-    inp = np.concatenate((cmp,
-                          bg,
-                          trimap.reshape((h, w, 1))), axis=2)
+    # inp = np.concatenate((cmp,
+    #                       bg,
+    #                       trimap.reshape((h, w, 1))), axis=2)
+    inp = np.concatenate((cmp, bg), axis=2)
     label = alpha.reshape((alpha.shape[0], alpha.shape[1], 1))
     return inp, label, fg
 
@@ -92,7 +93,7 @@ def random_scale(input, label, raw_fg):
 def get_batch(file_list, input_size, rd_scale=False, rd_mirror=False):
     """ returns normalized batch of cropped images (according to input_size)"""
     batch_size = len(file_list)
-    input = np.zeros((batch_size, input_size[0], input_size[1], 7), dtype=np.float)
+    input = np.zeros((batch_size, input_size[0], input_size[1], 6), dtype=np.float)
     label = np.zeros((batch_size, input_size[0], input_size[1], 1), dtype=np.float)
     raw_fgs = np.zeros((batch_size, input_size[0], input_size[1], 3), dtype=np.float)
     for i in range(len(file_list)):
@@ -120,11 +121,12 @@ def show_entry(inp, lab, name):
     assert inp.shape[0] == lab.shape[0] and inp.shape[1] == lab.shape[1]
     cmp = (inp[:, :, :3] + params.VGG_MEAN) / 255.
     bg = (inp[:, :, 3:6] + params.VGG_MEAN) / 255.
-    trimap = inp[:, :, 6] + 0.5
-    vis_trimap = np.repeat(trimap.reshape(trimap.shape[0], trimap.shape[1], 1), repeats=3, axis=2)
+    # trimap = inp[:, :, 6] + 0.5
+    # vis_trimap = np.repeat(trimap.reshape(trimap.shape[0], trimap.shape[1], 1), repeats=3, axis=2)
     vis_label = np.repeat(lab.reshape(lab.shape[0], lab.shape[1], 1), repeats=3, axis=2)
     row1 = np.concatenate((bg, cmp), axis=1)
-    row2 = np.concatenate((vis_trimap, vis_label), axis=1)
+    # row2 = np.concatenate((vis_trimap, vis_label), axis=1)
+    row2 = np.concatenate((np.zeros((vis_label.shape[0], vis_label.shape[1], 3)), vis_label), axis=1)
     vis = np.concatenate((row1, row2), axis=0)
     cv2.imshow('Entry visualisation: {}'.format(name), vis)
     cv2.waitKey(0)
@@ -178,7 +180,6 @@ def add_noise(img, var=0.1):
     noise = np.random.normal(0., var, (h, w, n))
     noised += noise
     return np.clip(noised, 0, 1)
-
 
 
 if __name__ == '__main__':

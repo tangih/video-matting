@@ -1,6 +1,6 @@
 DIM_TRAIN = '/home/tangih/Documents/datasets/image_matting/Adobe_Deep_Image_Matting_Dataset/Adobe-licensed/'
 DIM_TEST = '/home/tangih/Documents/datasets/image_matting/Adobe_Deep_Image_Matting_Test_Set'
-SYNTHETIC_DATASET = '/home/tangih/Documents/datasets/3d_models/SYNTHETIC/'
+SYNTHETIC_DATASET = '/home/tangih/Documents/video-matting/SYNTHETIC/'
 VOC_DATASET = '/home/tangih/Documents/datasets/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/JPEGImages/'
 TRAINING_LIST = './dataset/train.txt'
 N_EPOCHS = 3
