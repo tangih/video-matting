@@ -142,7 +142,7 @@ class UNetImage(UNet):
         # self.conv1_4 = tf.nn.relu(self.new_conv(self.conv1_3, 64, name='conv1_4'))
         self.conv1_3 = self.new_conv(self.upconv4, 1, name='conv1_5')
 
-        self.output = tf.nn.softmax(self.conv1_3, name='output')
+        self.output = tf.nn.sigmoid(self.conv1_3, name='output')
 
         self.data_dict = None
         print(("build model finished: %ds" % (time.time() - start_time)))
@@ -202,7 +202,7 @@ class UNetVideo(UNet):
         # self.conv1_4 = tf.nn.relu(self.new_conv(self.conv1_3, 64, name='conv1_4'))
         self.conv1_3 = self.new_conv(self.upconv4, 1, name='conv1_5')
 
-        self.output = tf.nn.softmax(self.conv1_3)
+        self.output = tf.nn.sigmoid(self.conv1_3)
 
         self.data_dict = None
         print(("build model finished: %ds" % (time.time() - start_time)))

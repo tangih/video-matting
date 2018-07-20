@@ -16,16 +16,18 @@ def init_conv(win_h, win_w, n_inputs, n_filters):
     return tf.get_variable(initializer=conv, name='weights'), tf.get_variable(initializer=biases, name='biases')
 
 
-def new_conv(input, n_filters, name):
+def new_conv(input, n_filters, name, phase):
     """ creates new convolution using Xavier initialisation """
     with tf.variable_scope(name):
         conv_weights, conv_biases = init_conv(3, 3, input.shape[-1], n_filters)
         conv = tf.nn.conv2d(input, conv_weights, [1, 1, 1, 1], padding='SAME')
         bias = tf.nn.bias_add(conv, conv_biases)
-        return bias
+        bn = tf.contrib.layers.batch_norm(bias, center=True, scale=True,
+                                          is_training=phase, scope='bn')
+        return bn
 
 
-def upconv_concat(prev_layers, prev, n_filters, name):
+def upconv_concat(prev_layers, prev, n_filters, name, phase):
     with tf.variable_scope(name):
         h, w = prev_layers[0].shape[1:3]
         upsampled = tf.image.resize_images(prev, [h, w])
@@ -36,7 +38,8 @@ def upconv_concat(prev_layers, prev, n_filters, name):
             layers.append(layer)
         layers.append(up_conv)
 
-        return tf.concat(layers, axis=-1, name="concat_{}".format(name))
+        return tf.contrib.layers.batch_norm(tf.concat(layers, axis=-1, name="concat_{}".format(name)),
+                                            center=True, scale=True, is_training=phase, scope = 'bn')
 
 
 class Vgg16:
@@ -111,35 +114,35 @@ class Vgg16:
 
 
 class UNetSimple:
-    def __init__(self, layers):
+    def __init__(self, layers, phase):
         self.layers = layers
-        self.select4_1 = tf.nn.relu(new_conv(layers['conv4'][0], 16, name='select4_1'))
-        self.select4_2 = tf.nn.relu(new_conv(layers['conv4'][1], 16, name='select4_2'))
-        self.select4_3 = tf.nn.relu(new_conv(layers['conv4'][2], 16, name='select4_3'))
+        self.select4_1 = tf.nn.relu(new_conv(layers['conv4'][0], 16, 'select4_1', phase))
+        self.select4_2 = tf.nn.relu(new_conv(layers['conv4'][1], 16, 'select4_2', phase))
+        self.select4_3 = tf.nn.relu(new_conv(layers['conv4'][2], 16, 'select4_3', phase))
         self.upconv4 = upconv_concat([self.select4_1, self.select4_2, self.select4_3],
-                                     layers['conv5'][-1], 48, name='upconv4')
-        self.conv4 = tf.nn.relu(new_conv(self.upconv4, 48, name='conv4'))
-        self.select3_1 = tf.nn.relu(new_conv(layers['conv3'][0], 8, name='select3_1'))
-        self.select3_2 = tf.nn.relu(new_conv(layers['conv3'][1], 8, name='select3_2'))
-        self.select3_3 = tf.nn.relu(new_conv(layers['conv3'][2], 8, name='select3_3'))
+                                     layers['conv5'][-1], 48, 'upconv4', phase)
+        self.conv4 = tf.nn.relu(new_conv(self.upconv4, 48, 'conv4', phase))
+        self.select3_1 = tf.nn.relu(new_conv(layers['conv3'][0], 8, 'select3_1', phase))
+        self.select3_2 = tf.nn.relu(new_conv(layers['conv3'][1], 8, 'select3_2', phase))
+        self.select3_3 = tf.nn.relu(new_conv(layers['conv3'][2], 8, 'select3_3', phase))
         self.upconv3 = upconv_concat([self.select3_1, self.select3_2, self.select3_3],
-                                     self.conv4, 24, name='upconv3')
-        self.conv3 = tf.nn.relu(new_conv(self.upconv3, 24, name='conv3'))
-        self.select2_1 = tf.nn.relu(new_conv(layers['conv2'][0], 4, name='select2_1'))
-        self.select2_2 = tf.nn.relu(new_conv(layers['conv2'][1], 4, name='select2_2'))
+                                     self.conv4, 24, 'upconv3', phase)
+        self.conv3 = tf.nn.relu(new_conv(self.upconv3, 24, 'conv3', phase), name='conv3')
+        self.select2_1 = tf.nn.relu(new_conv(layers['conv2'][0], 4, 'select2_1', phase))
+        self.select2_2 = tf.nn.relu(new_conv(layers['conv2'][1], 4, 'select2_2', phase))
         self.upconv2 = upconv_concat([self.select2_1, self.select2_2],
-                                     self.conv3, 24, name='upconv2')
-        self.conv2 = tf.nn.relu(new_conv(self.upconv2, 32, name='conv2'))
-        self.select1_1 = tf.nn.relu(new_conv(layers['conv1'][0], 2, name='select1_1'))
-        self.select1_2 = tf.nn.relu(new_conv(layers['conv1'][1], 2, name='select1_2'))
-        self.select1_3 = tf.nn.relu(new_conv(layers['conv1'][2], 2, name='select1_3'))
+                                     self.conv3, 24, 'upconv2', phase)
+        self.conv2 = tf.nn.relu(new_conv(self.upconv2, 32, 'conv2', phase), name='conv2')
+        self.select1_1 = tf.nn.relu(new_conv(layers['conv1'][0], 2, 'select1_1', phase))
+        self.select1_2 = tf.nn.relu(new_conv(layers['conv1'][1], 2, 'select1_2', phase))
+        self.select1_3 = tf.nn.relu(new_conv(layers['conv1'][2], 2, 'select1_3', phase))
         self.upconv1 = upconv_concat([self.select1_1, self.select1_2, self.select1_3],
-                                     self.conv2, 24, name='upconv1')
-        self.conv1 = tf.nn.relu( new_conv(self.upconv1, 32, name='conv1'))
-        self.output = tf.nn.softmax(new_conv(self.conv1, 1, name='output'))
+                                     self.conv2, 24, 'upconv1', phase)
+        self.conv1 = tf.nn.relu(new_conv(self.upconv1, 32, 'conv1', phase), name='conv1')
+        self.output = tf.nn.sigmoid(new_conv(self.conv1, 1, 'output', phase), name='probs')
 
 
-def create_model(cmp, bg, diff):
+def create_model(cmp, bg, diff, phase):
     vgg1 = Vgg16()
     vgg2 = Vgg16()
     vgg3 = Vgg16()
@@ -164,6 +167,5 @@ def create_model(cmp, bg, diff):
                       tf.concat([vgg1.conv5_3, vgg2.conv5_3, vgg3.conv5_3], axis=-1, name='conv5_3')]
         }
     with tf.variable_scope('simple_unet'):
-        model = UNetSimple(layers)
+        model = UNetSimple(layers, phase)
     return model
-
