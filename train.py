@@ -44,8 +44,8 @@ def training_procedure(sess, x, gt, raw_fg, train_file_list, test_file_list, pre
         cmp_loss = regular_l1(pred_cmp, in_cmp, name='compositional_loss')
         s_loss = tf.add(0.5 * alpha_loss, 0.5 * cmp_loss)
         loss = tf.reduce_mean(s_loss, name='loss')
-    with tf.variable_scope('training'):
-        lr = 1e-3
+    with tf.variable_scope('resume_training'):
+        lr = 1e-5
         print('Training with learning rate of {}'.format(lr))
         optimizer = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.9, beta2=0.999, epsilon=1e-08)
         train_op = optimizer.minimize(loss=loss, global_step=tf.train.get_global_step())
@@ -170,7 +170,7 @@ def simple_procedure(sess, in_cmp, in_bg, gt, raw_fg, phase, pred, train_writer,
         cmp_loss = regular_l1(pred_cmp, in_cmp, name='compositional_loss')
         s_loss = tf.add(0.5 * alpha_loss, 0.5 * cmp_loss)
         loss = tf.reduce_mean(s_loss, name='loss')
-    with tf.variable_scope('training'):
+    with tf.variable_scope('resume_training'):
         lr = 1e-3
         print('Training with learning rate of {}'.format(lr))
         optimizer = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.9, beta2=0.999, epsilon=1e-08)
@@ -317,6 +317,8 @@ def test_out_val_simple(meta_path, weight_folder):
 
 if __name__ == '__main__':
     # train()
-    simple_train()
+    # simple_train()
+    log_fold = 'log/weights_Wed_Jul_18_17:09:13_2018'
+    resume_simple(os.path.join(log_fold, 'model-28148.meta'), log_fold)
     # test_out_val_simple(meta_path='log/weights_Tue_Jul_17_15:15:20_2018/model-14074.meta',
     #                     weight_folder='log/weights_Tue_Jul_17_15:15:20_2018')
