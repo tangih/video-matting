@@ -170,7 +170,7 @@ def simple_procedure(sess, in_cmp, in_bg, gt, raw_fg, phase, pred, train_writer,
         cmp_loss = regular_l1(pred_cmp, in_cmp, name='compositional_loss')
         s_loss = tf.add(0.5 * alpha_loss, 0.5 * cmp_loss)
         loss = tf.reduce_mean(s_loss, name='loss')
-    with tf.variable_scope('resume_training'):
+    with tf.variable_scope('resume_training_2'):
         lr = 1e-3
         print('Training with learning rate of {}'.format(lr))
         optimizer = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.9, beta2=0.999, epsilon=1e-08)
@@ -206,22 +206,22 @@ def simple_procedure(sess, in_cmp, in_bg, gt, raw_fg, phase, pred, train_writer,
             iteration += 1
         # validation
         print('Training completed. Computing validation loss...')
-        val_loss = 0.
-        n_batch = 0
-        while not loader.epoch_is_over(test_list, params.BATCH_SIZE):
-            batch_list = loader.get_batch_list(test_list, params.BATCH_SIZE)
-            cmp, bg, lab, rfg = loader.simple_batch(batch_list, params.INPUT_SIZE)
-            # inp, lab, rfg = loader.get_batch(batch_list, params.INPUT_SIZE, rd_scale=False, rd_mirror=True)
-            feed_dict = {in_cmp: cmp, in_bg: bg, gt: lab, raw_fg: rfg, phase: False}
-            ls = sess.run([loss], feed_dict=feed_dict)
+        # val_loss = 0.
+        # n_batch = 0
+        # while not loader.epoch_is_over(test_list, params.BATCH_SIZE):
+        #     batch_list = loader.get_batch_list(test_list, params.BATCH_SIZE)
+        #     cmp, bg, lab, rfg = loader.simple_batch(batch_list, params.INPUT_SIZE)
+        #     inp, lab, rfg = loader.get_batch(batch_list, params.INPUT_SIZE, rd_scale=False, rd_mirror=True)
+        #     feed_dict = {in_cmp: cmp, in_bg: bg, gt: lab, raw_fg: rfg, phase: False}
+        #     ls = sess.run([loss], feed_dict=feed_dict)
             # test_writer.add_summary(summary, iteration)
-            val_loss += np.mean(ls)
-            n_batch += 1
-        val_loss /= n_batch
-        if prev_val_loss != -1.:
-            improvement = '{:2f}%'.format((prev_val_loss - val_loss) / prev_val_loss)
-        print('Validation loss: {:.3f}. Improvement: {}'.format(val_loss, improvement))
-        prev_val_loss = val_loss
+            # val_loss += np.mean(ls)
+            # n_batch += 1
+        # val_loss /= n_batch
+        # if prev_val_loss != -1.:
+        #     improvement = '{:2f}%'.format((prev_val_loss - val_loss) / prev_val_loss)
+        # print('Validation loss: {:.3f}. Improvement: {}'.format(val_loss, improvement))
+        # prev_val_loss = val_loss
 
         print('Saving examples')
         # loads and visualize example prediction of current model
@@ -282,6 +282,86 @@ def resume_simple(meta_path, weight_folder):
                          train_file_list, test_file_list)
 
 
+def video_procedure(sess, in_cmp, in_bg, in_warped, gt, raw_fg, phase, pred, train_writer, ex_writer, saver,
+                    train_file_list, test_file_list):
+    train_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'model/simple_unet')
+    print('Training variables:')
+    print(train_vars)
+    t_str = time.asctime().replace(' ', '_')
+    with tf.variable_scope('loss'):
+        alpha_loss = regular_l1(pred, gt, name='alpha_loss')
+        pred_cmp = composite(raw_fg, in_bg, pred)
+        cmp_loss = regular_l1(pred_cmp, in_cmp, name='compositional_loss')
+        s_loss = tf.add(0.5 * alpha_loss, 0.5 * cmp_loss)
+        loss = tf.reduce_mean(s_loss, name='loss')
+    with tf.variable_scope('resume_training_2'):
+        lr = 1e-3
+        print('Training with learning rate of {}'.format(lr))
+        optimizer = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.9, beta2=0.999, epsilon=1e-08)
+        train_op = optimizer.minimize(loss=loss, global_step=tf.train.get_global_step(), var_list=train_vars)
+    with tf.variable_scope('summary'):
+        summary_loss = tf.summary.scalar('loss', loss)
+        summary_alpha_loss = tf.summary.scalar('alpha_loss', tf.reduce_mean(alpha_loss))
+        summary_cmp_loss = tf.summary.scalar('compositional_loss', tf.reduce_mean(cmp_loss))
+        summary_cmp = tf.summary.image('composite', bgr2rgb(in_cmp))
+        summary_gt = tf.summary.image('ground_truth', gt)
+        summary_pred = tf.summary.image('prediction', pred)
+    train_summaries = [summary_loss, summary_alpha_loss, summary_cmp_loss]
+    ex_summaries = [summary_cmp, summary_gt, summary_pred]
+    train_merged = tf.summary.merge(train_summaries)
+    ex_merged = tf.summary.merge(ex_summaries)
+    iteration = 0
+    sess.run(tf.global_variables_initializer())
+
+    for epoch in range(params.N_EPOCHS):
+        training_list = train_file_list.copy()
+        test_list = test_file_list.copy()
+        random.shuffle(training_list)
+        random.shuffle(test_list)
+        # training
+        while not loader.epoch_is_over(training_list, params.BATCH_SIZE):
+            print('Training model, epoch {}/{}, iteration {}.'.format(epoch + 1, params.N_EPOCHS, iteration + 1))
+            batch_list = loader.get_batch_list(training_list, params.BATCH_SIZE)
+            cmp, bg, lab, prev_lab, rfg = loader.video_batch(batch_list, params.INPUT_SIZE)
+            feed_dict = {in_cmp: cmp, in_bg: bg, gt: lab, raw_fg: rfg, in_warped: prev_lab, phase: True}
+            summary, _ = sess.run([train_merged, train_op], feed_dict=feed_dict)
+            train_writer.add_summary(summary, iteration)
+            iteration += 1
+
+        print('Saving examples')
+        # loads and visualize example prediction of current model
+        n_ex = 5
+        ex_list = [test_file_list[np.random.randint(0, len(test_file_list))] for _ in range(n_ex)]
+        ex_cmp, ex_bg, ex_lab, _ = loader.simple_batch(ex_list, params.INPUT_SIZE)
+        feed_dict = {in_cmp: ex_cmp, in_bg: ex_bg, gt: ex_lab, phase: False}
+        summary = sess.run([ex_merged], feed_dict)[0]
+        ex_writer.add_summary(summary, iteration)
+        print('Saving chekpoint...')
+        saver.save(sess, os.path.join(params.LOG_DIR, 'weights_{}'.format(t_str), 'model'), global_step=iteration)
+
+
+def video_train():
+    with tf.variable_scope('input'):
+        in_cmp = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 3], name='composite')
+        in_bg = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 3], name='background')
+        in_warped = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 3], name='background')
+        raw_fg = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 3], name='raw_fg')
+        gt = tf.placeholder('float', [None, params.INPUT_SIZE[0], params.INPUT_SIZE[1], 1], name='gt')
+        phase = tf.placeholder(tf.bool, name='phase')
+
+    with tf.variable_scope('model'):
+        unet = unet_simple.create_model(in_cmp, in_bg, in_warped, phase)
+        pred = unet.output
+    train_list, test_list = loader.video_file_list()
+    with tf.Session() as sess:
+        t_str = time.asctime().replace(' ', '_')
+        train_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'train_{}'.format(t_str)), sess.graph)
+        ex_writer = tf.summary.FileWriter(os.path.join(params.LOG_DIR, 'examples_{}'.format(t_str)))
+        saver = tf.train.Saver()
+        video_procedure(sess, in_cmp, in_bg, in_warped, gt, raw_fg, phase, pred, train_writer, ex_writer, saver,
+                        train_list, test_list)
+
+
 def test_out_val_simple(meta_path, weight_folder):
     train_file_list = loader.get_file_list(params.SYNTHETIC_DATASET, params.TRAINING_LIST)
     test_file_list = loader.get_file_list(params.SYNTHETIC_DATASET, params.TRAINING_LIST)
@@ -318,7 +398,8 @@ def test_out_val_simple(meta_path, weight_folder):
 if __name__ == '__main__':
     # train()
     # simple_train()
-    log_fold = 'log/weights_Wed_Jul_18_17:09:13_2018'
-    resume_simple(os.path.join(log_fold, 'model-28148.meta'), log_fold)
+    # log_fold = 'log/weights_Wed_Jul_18_17:09:13_2018'
+    log_fold = 'log/weights_Mon_Jul_23_19:31:10_2018'
+    resume_simple(os.path.join(log_fold, 'model-35185.meta'), log_fold)
     # test_out_val_simple(meta_path='log/weights_Tue_Jul_17_15:15:20_2018/model-14074.meta',
     #                     weight_folder='log/weights_Tue_Jul_17_15:15:20_2018')

@@ -237,6 +237,109 @@ def add_noise(img, var=0.1):
     return np.clip(noised, 0, 1)
 
 
+def video_file_list():
+    augmented_train_list = []
+    augmented_test_list = []
+    synthetic_train_list = []
+    synthetic_test_list = []
+    for filename in os.listdir(os.path.join('flow', 'augmented', 'flow')):
+        basename = '_'.join(filename.split('.')[0].split('_')[:-1])
+        id_ = int(filename.split('.')[0].split('_')[-1])
+        prev_path = os.path.join('flow', 'augmented', 'fg', '{}_{}.png'.format(basename, id_))
+        fg_path = os.path.join('flow', 'augmented', 'fg', '{}_{}.png'.format(basename, id_+1))
+        bg_path = os.path.join('flow', 'augmented', 'bg', '{}_{}.png'.format(basename, id_+1))
+        flo_path = os.path.join('flow', 'augmented', 'flow', filename)
+        if not os.path.isfile(prev_path) or not os.path.isfile(fg_path) or not os.path.isfile(bg_path):
+            print('ERROR LOADING FILE {} FOR ID {}'.format(basename, id_))
+            continue
+        if basename in params.TRAIN_AUGMENTED:
+            augmented_train_list.append((fg_path, bg_path, prev_path, flo_path))
+        elif basename in params.TEST_AUGMENTED:
+            augmented_test_list.append((fg_path, bg_path, prev_path, flo_path))
+        else:
+            print('ERROR, CANT FIND {}'.format(basename))
+    # synthetic_list = []
+    for vid_title in os.listdir(os.path.join('flow', 'synthetic')):
+        files = sorted(os.listdir(os.path.join('flow', 'synthetic', vid_title)))
+        for filename in files:
+            id_ = int(filename.split('.')[0][2:])
+
+            flo_path = os.path.join('flow', 'synthetic', vid_title, filename)
+            fg_path = os.path.join('SYNTHETIC', 'fg', vid_title, 'in{:04d}.png'.format(id_+1))
+            bg_path = os.path.join('SYNTHETIC', 'bg', vid_title, 'in{:04d}.png'.format(id_+1))
+            prev_path = os.path.join('SYNTHETIC', 'fg', vid_title, 'in{:04d}.png'.format(id_))
+            if not os.path.isfile(prev_path):
+                continue
+            if not os.path.isfile(bg_path) or not os.path.isfile(fg_path):
+                print('ERROR LOADING INPUT (ID: {} / VIDEO: {})'.format(id_, vid_title))
+            if vid_title in params.TRAIN_SYNTHETIC:
+                synthetic_train_list.append((fg_path, bg_path, prev_path, flo_path))
+            elif vid_title in params.TEST_SYNTHETIC:
+                synthetic_test_list.append((fg_path, bg_path, prev_path, flo_path))
+    return augmented_train_list + synthetic_train_list, augmented_test_list + synthetic_test_list
+
+
+def video_load_crop(entry, input_size):
+    fg_path, bg_path, previous_path, flo_path = entry
+    alpha, fg = reader.read_fg_img(fg_path)
+    fg = fg.astype(dtype=np.float)  # potentially very big
+    bg = cv2.imread(bg_path).astype(dtype=np.float)
+    flow = reader.read_flow(flo_path)
+    prev_alpha, _ = reader.read_fg_img(previous_path)
+    warped_alpha = flow.warp_img(prev_alpha)
+    crop_type = [(320, 320), (480, 480), (640, 640)]  # we crop images of different sizes
+    crop_h, crop_w = crop_type[np.random.randint(0, len(crop_type))]
+    fg_h, fg_w = fg.shape[:2]
+    if fg_h < crop_h or fg_w < crop_w:
+        # in that case the image is not too big, and we have to add padding
+        alpha = alpha.reshape((alpha.shape[0], alpha.shape[1], 1))
+        warped_alpha = np.repeat(warped_alpha[:, :, np.newaxis], 3, axis=2)
+        cat = np.concatenate((fg, alpha, warped_alpha), axis=2)
+        cropped_cat = get_padded_img(cat, crop_h, crop_w)
+        fg, alpha, warped_alpha = np.split(cropped_cat, indices_or_sections=[3, 4, 5], axis=2)
+    # otherwise, the fg is likely to be HRes, we directly crop it and dismiss the original image
+    # to avoid manipulation big images
+    fg_h, fg_w = fg.shape[:2]
+    i, j = np.random.randint(0, fg_h - crop_h + 1), np.random.randint(0, fg_w - crop_w + 1)
+    fg = fg[i:i + crop_h, j:j + crop_h]
+    alpha = alpha[i:i + crop_h, j:j + crop_h]
+    warped_alpha = warped_alpha[i:i + crop_h, j:j + crop_h]
+    # randomly picks top-left corner
+    bg_crop_h, bg_crop_w = int(np.ceil(crop_h * bg.shape[0] / fg.shape[0])), \
+                           int(np.ceil(crop_w * bg.shape[1] / fg.shape[1]))
+    padded_bg = get_padded_img(bg, bg_crop_h, bg_crop_w)
+    i, j = np.random.randint(0, bg.shape[0] - bg_crop_h + 1), np.random.randint(0, bg.shape[1] - bg_crop_w + 1)
+    cropped_bg = padded_bg[i:i + bg_crop_h, j:j + bg_crop_w]
+    bg = cv2.resize(src=cropped_bg, dsize=input_size, interpolation=cv2.INTER_LINEAR)
+    fg = cv2.resize(fg, input_size, interpolation=cv2.INTER_LINEAR)
+    alpha = cv2.resize(alpha, input_size, interpolation=cv2.INTER_LINEAR)
+    warped_alpha = cv2.resize(warped_alpha, input_size, interpolation=cv2.INTER_LINEAR)
+
+    cmp = reader.create_composite_image(fg, bg, alpha)
+    cmp -= params.VGG_MEAN
+    bg -= params.VGG_MEAN
+    # inp = np.concatenate((cmp,
+    #                       bg,
+    #                       trimap.reshape((h, w, 1))), axis=2)
+    label = alpha.reshape((alpha.shape[0], alpha.shape[1], 1))
+    return cmp, bg, label, warped_alpha, fg
+
+
+def video_batch(file_list, input_size):
+    batch_size = len(file_list)
+    cmps = np.zeros((batch_size, input_size[0], input_size[1], 3), dtype=np.float)
+    bgs = np.zeros((batch_size, input_size[0], input_size[1], 3), dtype=np.float)
+    label = np.zeros((batch_size, input_size[0], input_size[1], 1), dtype=np.float)
+    warped = np.zeros((batch_size, input_size[0], input_size[1], 1), dtype=np.float)
+    raw_fgs = np.zeros((batch_size, input_size[0], input_size[1], 3), dtype=np.float)
+    for i in range(len(file_list)):
+        # ref = time.time()
+        # print(file_list[i])
+        cmp, bg, lab, prev_lab, raw_fg = video_load_crop(file_list[i], input_size)
+        cmps[i], bgs[i], label[i], warped[i], raw_fgs[i] = cmp, bg, lab, prev_lab, raw_fg
+    return cmps, bgs, label, warped, raw_fgs
+
+
 if __name__ == '__main__':
     # file_list = get_file_list(params.SYNTHETIC_DATASET, './dataset/valid.txt')
     # for i in range(10):
