@@ -10,6 +10,7 @@ import unet
 import params
 import unet_simple
 
+
 def composite(fg, bg, alpha):
     """ create composite image from tensors """
     tri_alpha = tf.concat(values=[alpha, alpha, alpha], axis=3)

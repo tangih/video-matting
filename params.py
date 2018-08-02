@@ -3,6 +3,7 @@ DIM_TEST = '/home/tangih/Documents/datasets/image_matting/Adobe_Deep_Image_Matti
 SYNTHETIC_DATASET = '/home/tangih/Documents/video-matting/SYNTHETIC/'
 VOC_DATASET = '/home/tangih/Documents/datasets/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/JPEGImages/'
 TRAINING_LIST = './dataset/train.txt'
+TEST_LIST = './dataset/valid.txt'
 N_EPOCHS = 3
 BATCH_SIZE = 8
 INPUT_SIZE = (320, 320)
