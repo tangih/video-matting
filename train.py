@@ -164,14 +164,16 @@ def simple_procedure(sess, in_cmp, in_bg, gt, raw_fg, phase, pred, train_writer,
     print(train_vars)
     improvement = 'NaN'
     t_str = time.asctime().replace(' ', '_')
+    month = t_str.split('_')[1]
+    date = int(t_str.split('_')[3])
     with tf.variable_scope('loss'):
         alpha_loss = regular_l1(pred, gt, name='alpha_loss')
         pred_cmp = composite(raw_fg, in_bg, pred)
         cmp_loss = regular_l1(pred_cmp, in_cmp, name='compositional_loss')
         s_loss = tf.add(0.5 * alpha_loss, 0.5 * cmp_loss)
         loss = tf.reduce_mean(s_loss, name='loss')
-    with tf.variable_scope('resume_training_2'):
-        lr = 1e-3
+    with tf.variable_scope('resume_training_{}_{}'.format(month, date)):
+        lr = 1e-4
         print('Training with learning rate of {}'.format(lr))
         optimizer = tf.train.AdamOptimizer(learning_rate=lr, beta1=0.9, beta2=0.999, epsilon=1e-08)
         train_op = optimizer.minimize(loss=loss, global_step=tf.train.get_global_step(), var_list=train_vars)
@@ -285,8 +287,8 @@ def resume_simple(meta_path, weight_folder):
 def video_procedure(sess, in_cmp, in_bg, in_warped, gt, raw_fg, phase, pred, train_writer, ex_writer, saver,
                     train_file_list, test_file_list):
     train_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'model/simple_unet')
-    print('Training variables:')
-    print(train_vars)
+    # print('Training variables:')
+    # print(train_vars)
     t_str = time.asctime().replace(' ', '_')
     with tf.variable_scope('loss'):
         alpha_loss = regular_l1(pred, gt, name='alpha_loss')
@@ -312,8 +314,8 @@ def video_procedure(sess, in_cmp, in_bg, in_warped, gt, raw_fg, phase, pred, tra
     ex_merged = tf.summary.merge(ex_summaries)
     iteration = 0
     sess.run(tf.global_variables_initializer())
-
     for epoch in range(params.N_EPOCHS):
+        print('Running epoch {} of {} on {} examples'.format(epoch+1, params.N_EPOCHS, len(train_file_list)))
         training_list = train_file_list.copy()
         test_list = test_file_list.copy()
         random.shuffle(training_list)
@@ -332,8 +334,8 @@ def video_procedure(sess, in_cmp, in_bg, in_warped, gt, raw_fg, phase, pred, tra
         # loads and visualize example prediction of current model
         n_ex = 5
         ex_list = [test_file_list[np.random.randint(0, len(test_file_list))] for _ in range(n_ex)]
-        ex_cmp, ex_bg, ex_lab, _ = loader.simple_batch(ex_list, params.INPUT_SIZE)
-        feed_dict = {in_cmp: ex_cmp, in_bg: ex_bg, gt: ex_lab, phase: False}
+        ex_cmp, ex_bg, ex_lab, ex_prevlab, _ = loader.video_batch(ex_list, params.INPUT_SIZE)
+        feed_dict = {in_cmp: ex_cmp, in_bg: ex_bg, gt: ex_lab, in_warped: ex_prevlab,  phase: False}
         summary = sess.run([ex_merged], feed_dict)[0]
         ex_writer.add_summary(summary, iteration)
         print('Saving chekpoint...')
@@ -399,7 +401,6 @@ if __name__ == '__main__':
     # train()
     # simple_train()
     # log_fold = 'log/weights_Wed_Jul_18_17:09:13_2018'
-    log_fold = 'log/weights_Mon_Jul_23_19:31:10_2018'
-    resume_simple(os.path.join(log_fold, 'model-35185.meta'), log_fold)
-    # test_out_val_simple(meta_path='log/weights_Tue_Jul_17_15:15:20_2018/model-14074.meta',
-    #                     weight_folder='log/weights_Tue_Jul_17_15:15:20_2018')
+    # log_fold = 'log/weights_Fri_Jul_27_12:03:44_2018'
+    # resume_simple(os.path.join(log_fold, 'model-70370.meta'), log_fold)
+    video_train()
